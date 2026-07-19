@@ -146,7 +146,7 @@ class Recommender:
 
 def load_songs(csv_path: str) -> List[Dict]:
     """
-    Loads songs from a CSV file.
+    Loads songs from a CSV file. Returns a list of Dicts of song values.
     Required by src/main.py
     """
     songs = []
@@ -169,6 +169,7 @@ def load_songs(csv_path: str) -> List[Dict]:
                 "playlist_adds": int(row["playlist_adds"]),
                 "play_count": int(row["play_count"]),
             })
+    print(f'Loaded {len(songs)} number of songs successfully.')
     return songs
 
 def _as_favorite_set(value) -> Set[str]:

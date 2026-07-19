@@ -48,6 +48,14 @@ At a very basic level the recommendations are based on vector-similarity as note
 
 You can include a simple diagram or bullet list if helpful.
 
+
+### Recommendation Logic
+1. Input: UserProfile, Song List (ratings for each song)
+2. Check against each song for vector similarity
+3. Computer Similarity score -> Weighted Scores for each song returned + reasons
+4. Take Top K songs 
+5. Output ranked songs and reasons for recommend
+
 ---
 
 ## Getting Started
