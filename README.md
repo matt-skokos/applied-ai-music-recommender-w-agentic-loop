@@ -106,6 +106,33 @@ Paste a sample of your recommender's output here as a text block so a reader can
 #   3. ...
 ```
 
+Output for user with : 
+User profile: genre=indie, mood=chill, energy=low
+
+(base) matthewskokos@Mac src % python main.py
+Loaded 20 number of songs successfully.
+
+Top 5 Recommendations
+=====================
+
+1. Midnight Coding  —  score: 0.61
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+2. Library Rain  —  score: 0.61
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+3. Spacewalk Thoughts  —  score: 0.60
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+4. Slow Bloom  —  score: 0.41
+   - energy closely matches your taste
+
+5. Amber Fields  —  score: 0.41
+   - energy closely matches your taste
+
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
 
 ---

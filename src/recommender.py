@@ -1,4 +1,5 @@
 import csv
+import heapq
 from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass, field
 
@@ -56,6 +57,7 @@ class UserProfile:
     play_counts: Dict[int, int] = field(default_factory=dict)
 
 def _normalize_tempo(tempo_bpm: float) -> float:
+    """Scales a raw BPM value to the 0.00-1.00 range used by target_tempo."""
     return max(0.0, min(1.0, (tempo_bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)))
 
 def _score(
@@ -110,6 +112,7 @@ def _score(
     return score, reasons
 
 def _score_song_for_user(user: UserProfile, song: Song) -> Tuple[float, List[str]]:
+    """Adapts a Song/UserProfile pair into the shared _score() scoring core."""
     return _score(
         genre_match=song.genre in user.favorite_genres,
         mood_match=song.mood in user.favorite_moods,
@@ -133,14 +136,15 @@ class Recommender:
     Required by tests/test_recommender.py
     """
     def __init__(self, songs: List[Song]):
+        """Stores the candidate songs to recommend from."""
         self.songs = songs
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
-        scored = [(_score_song_for_user(user, song)[0], song) for song in self.songs]
-        scored.sort(key=lambda pair: pair[0], reverse=True)
-        return [song for _, song in scored[:k]]
+        """Returns the top k songs for the user, sorted from highest to lowest score."""
+        return heapq.nlargest(k, self.songs, key=lambda song: _score_song_for_user(user, song)[0])
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
+        """Returns a human-readable string explaining why the song was recommended."""
         _, reasons = _score_song_for_user(user, song)
         return "; ".join(reasons)
 
@@ -173,6 +177,7 @@ def load_songs(csv_path: str) -> List[Dict]:
     return songs
 
 def _as_favorite_set(value) -> Set[str]:
+    """Normalizes a genre/mood preference (None, str, or collection) into a set."""
     if value is None:
         return set()
     if isinstance(value, str):
@@ -213,5 +218,4 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     for song in songs:
         score, reasons = score_song(user_prefs, song)
         scored.append((song, score, "; ".join(reasons)))
-    scored.sort(key=lambda item: item[1], reverse=True)
-    return scored[:k]
+    return heapq.nlargest(k, scored, key=lambda item: item[1])
