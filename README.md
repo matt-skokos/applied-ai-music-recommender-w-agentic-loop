@@ -22,10 +22,29 @@ Explain your design in plain language.
 Some prompts to answer:
 
 - What features does each `Song` use in your system
+  I'll separate into Content Features:
+  1. Genre, coarsest, most reliable 
+  2. Mood - direct categorical label
+  3. Energy - continuous 0-1, easy to compare
+  4. Tempo(BPM) - numerical and straightforward
+  5. Valence - pairs with energy
+  6. Danceability - continous 0-1, same shape as others
+
+  and User Behavior features:
+  7. Likes - clear signal
+  8. Skips - another clear signal depending on listen-length
+  9. Playlist adds - which songs "co-occur"
+  10. Play count - another simple integer to imply signal strength
+
   - For example: genre, mood, energy, tempo
 - What information does your `UserProfile` store
+I'll need to store 2 different types of user data in the UserProfile.
+The first is a "taste" vector. It describes what type of content the user will rank closely to with content that has similar genre, energy, mood, etc.
+The second is an interaction history. This will map different user actions. It will help to weight song profiles that have been repeated, not skipped and such.
 - How does your `Recommender` compute a score for each song
+The recommender will heavily lean on vector-similarity scoring. This is to say that the euclidean distance or angle between the two  in a vector space, with very similar profile vectors will create a match between them. The closer this song, the sooner it will be recommended to the user.  
 - How do you choose which songs to recommend
+At a very basic level the recommendations are based on vector-similarity as noted above. I will also include a flag for songs that haven't been heard before as being recommended first.
 
 You can include a simple diagram or bullet list if helpful.
 
