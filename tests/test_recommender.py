@@ -8,11 +8,28 @@ from src.recommender import (
     Recommender,
     load_songs,
     score_song,
+    recommend_songs,
     W_GENRE,
     W_MOOD,
 )
 
 SONGS_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "songs.csv"
+
+# 10 distinct user preference dicts covering different genre/mood combos from
+# songs.csv, a range of energy levels, and a few edge cases: list-based
+# favorites (#9), a missing mood key (#9), and no categorical match at all (#10).
+USER_PROFILES = [
+    {"genre": "pop", "mood": "happy", "energy": 0.85},
+    {"genre": "lofi", "mood": "chill", "energy": 0.35, "tempo": 0.15, "valence": 0.55, "danceability": 0.55, "acousticness": 0.8},
+    {"genre": "rock", "mood": "intense", "energy": 0.9, "tempo": 0.9},
+    {"genre": "ambient", "mood": "chill", "energy": 0.25, "acousticness": 0.9},
+    {"genre": "jazz", "mood": "relaxed", "energy": 0.35, "danceability": 0.5},
+    {"genre": "house", "mood": "energetic", "energy": 0.88, "danceability": 0.9},
+    {"genre": "hip-hop", "mood": "confident", "energy": 0.8, "danceability": 0.85},
+    {"genre": "classical", "mood": "dreamy", "energy": 0.3, "acousticness": 0.95},
+    {"favorite_genres": ["folk", "r&b"], "energy": 0.4},
+    {"energy": 0.6, "tempo": 0.5, "valence": 0.6, "danceability": 0.6, "acousticness": 0.4},
+]
 
 def _neutral_song(**overrides) -> dict:
     # tempo_bpm=120 normalizes to 0.5 (MIN_BPM=60, MAX_BPM=180), matching the
@@ -163,3 +180,16 @@ def test_tempo_below_min_bpm_clamps_instead_of_exceeding_score_bounds():
     score, _ = score_song(prefs, song)
 
     assert 0.0 <= score <= 1.0
+
+
+@pytest.mark.parametrize("user_prefs", USER_PROFILES)
+def test_recommend_songs_handles_diverse_user_profiles(user_prefs):
+    songs = load_songs(str(SONGS_CSV_PATH))
+    recommendations = recommend_songs(user_prefs, songs, k=5)
+
+    assert len(recommendations) == 5
+
+    scores = [score for _, score, _ in recommendations]
+    assert scores == sorted(scores, reverse=True)
+    assert all(0.0 <= score <= 1.0 for score in scores)
+    assert all(explanation.strip() for _, _, explanation in recommendations)

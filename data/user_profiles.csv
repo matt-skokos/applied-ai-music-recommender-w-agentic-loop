@@ -1,0 +1,20 @@
+profile_id,category,test_name,genre,mood,energy,tempo,valence,danceability,acousticness,skips,likes,notes
+1,diverse,test_recommend_songs_handles_diverse_user_profiles,pop,happy,0.85,,,,,,,baseline high-energy pop/happy profile
+2,diverse,test_recommend_songs_handles_diverse_user_profiles,lofi,chill,0.35,0.15,0.55,0.55,0.8,,,chill lofi profile with the full taste vector specified
+3,diverse,test_recommend_songs_handles_diverse_user_profiles,rock,intense,0.9,0.9,,,,,,high energy/tempo rock profile
+4,diverse,test_recommend_songs_handles_diverse_user_profiles,ambient,chill,0.25,,,,0.9,,,"low energy, high acousticness ambient/chill profile"
+5,diverse,test_recommend_songs_handles_diverse_user_profiles,jazz,relaxed,0.35,,,0.5,,,,relaxed jazz profile
+6,diverse,test_recommend_songs_handles_diverse_user_profiles,house,energetic,0.88,,,0.9,,,,high energy/danceability house profile
+7,diverse,test_recommend_songs_handles_diverse_user_profiles,hip-hop,confident,0.8,,,0.85,,,,confident hip-hop profile
+8,diverse,test_recommend_songs_handles_diverse_user_profiles,classical,dreamy,0.3,,,,0.95,,,"low energy, high acousticness classical profile"
+9,diverse,test_recommend_songs_handles_diverse_user_profiles,folk|r&b,,0.4,,,,,,,"list-valued favorite_genres (folk, r&b) with no mood key given"
+10,diverse,test_recommend_songs_handles_diverse_user_profiles,,,0.6,0.5,0.6,0.6,0.4,,,"no genre/mood at all -- taste vector only, no categorical match possible"
+11,adversarial,test_gap_interaction_history_is_never_scored,pop,happy,0.8,0.5,0.8,0.8,0.2,5,0,"matches the taste vector perfectly but has 5 recorded skips on that exact song; skips/likes are never read by the scorer, so it still ranks #1"
+12,adversarial,test_gap_none_value_silently_shadows_favorite_genres (shadowed),None+favorite_genres=pop,None+favorite_moods=happy,0.5,0.5,0.5,0.5,0.5,,,genre/mood explicitly set to None alongside favorite_genres/favorite_moods -- the None silently wins and the stated preference is dropped
+13,adversarial,test_gap_none_value_silently_shadows_favorite_genres (intended),favorite_genres=pop,favorite_moods=happy,0.5,0.5,0.5,0.5,0.5,,,"control case: favorite_genres/favorite_moods only, no colliding genre/mood key -- correctly gets credit"
+14,adversarial,test_gap_unnormalized_tempo_breaks_score_bounds,house,energetic,0.9,128,,,,,,"tempo given as raw BPM (128) instead of the expected 0.00-1.00 scale; produces a deeply negative score, breaking the documented 0-1 bound"
+15,adversarial,test_gap_genre_and_mood_matching_is_case_sensitive (lowercase),pop,happy,0.5,0.5,0.5,0.5,0.5,,,"baseline lowercase profile, matches the song exactly"
+16,adversarial,test_gap_genre_and_mood_matching_is_case_sensitive (capitalized),Pop,Happy,0.5,0.5,0.5,0.5,0.5,,,same profile capitalized -- loses the entire genre+mood bonus against an identical song
+17,adversarial,test_gap_contradictory_mood_and_energy_still_scores_perfectly,rock,chill,0.95,0.9,0.5,0.5,0.5,,,mood=chill paired with a high energy/tempo target -- internally contradictory taste vector still scores a matching song a perfect 1.0
+18,adversarial,test_gap_no_artist_diversity_control,folk,nostalgic,0.38,0.25,0.58,0.47,0.85,,,"matches Wildgrass Trio's folk sound closely -- both of their songs dominate the top 3, no diversity control"
+19,adversarial,test_gap_liking_every_genre_erases_genres_discriminative_power,ALL_GENRES_IN_CATALOG,,0.5,0.5,0.5,0.5,0.5,,,"favorites every genre in the catalog -- genre_match becomes true for all 20 songs, erasing its discriminative power despite being the highest-weighted feature"

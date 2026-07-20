@@ -145,6 +145,59 @@ Use this section to document the experiments you ran. For example:
 - What happened when you added tempo or valence to the score
 - How did your system behave for different types of users
 
+### Removal of genre weight to test different outputs in main.py
+original ( with genre weighted ):
+
+Top 5 Recommendations
+=====================
+
+1. Midnight Coding  —  score: 0.61
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+2. Library Rain  —  score: 0.61
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+3. Spacewalk Thoughts  —  score: 0.60
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+4. Slow Bloom  —  score: 0.41
+   - energy closely matches your taste
+
+5. Amber Fields  —  score: 0.41
+   - energy closely matches your taste
+
+After removing genre and mood from calculation: 
+
+Top 5 Recommendations
+=====================
+
+1. Slow Bloom  —  score: 0.92
+   - energy closely matches your taste
+
+2. Marble Skies  —  score: 0.91
+   - energy closely matches your taste
+
+3. Spacewalk Thoughts  —  score: 0.89
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+4. Coffee Shop Stories  —  score: 0.89
+   - energy closely matches your taste
+
+5. Library Rain  —  score: 0.88
+   - matches your favorite mood (chill)
+   - energy closely matches your taste
+
+Note:
+1. Ranking scores were elevated ( not as much spread)
+2. The order shifted while several of the same songs remained
+3. Some unreturned results were added to the recs
+4. They seem quite a bit less accurate than the originals
+
+
 ---
 
 ## Limitations and Risks
