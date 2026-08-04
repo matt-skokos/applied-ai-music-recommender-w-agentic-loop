@@ -1,0 +1,10 @@
+flowchart TD
+    A[User feedback<br/>Up, down, or skip] --> B[Update state<br/>Weights + exclude list]
+    B --> C[Show transparency message<br/>Every round]
+    C --> D[Rebuild candidate pool<br/>Apply weights, exclusions]
+    D --> E{Any candidates left?}
+    E -- Yes --> F[Serve updated top-k<br/>Next round begins]
+    E -- No --> G{Any constraint left to relax?}
+    G -- Yes --> H[Relax next constraint<br/>Log fallback event]
+    H --> D
+    G -- No --> I[Show oops message<br/>No results left]
