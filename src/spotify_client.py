@@ -11,16 +11,21 @@ empty, so it can never actually serve as a fallback.
 """
 
 import base64
+import json
 import os
 import time
+from dataclasses import replace
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
 
 try:
+    from recommender import Song
     from session import LogStatus
 except ImportError:
+    from src.recommender import Song
     from src.session import LogStatus
 
 load_dotenv()
@@ -102,3 +107,13 @@ def fetch_song_genres(title: str, artist: str) -> Tuple[List[str], LogStatus, di
         return [], LogStatus.FALLBACK, {"tier": "skip", "reason": "artist_has_no_genres"}
     except Exception as exc:
         return [], LogStatus.ERROR, {"tier": "skip", "reason": str(exc)}
+
+
+def apply_genre_cache(songs: List[Song], cache_path: str) -> List[Song]:
+    """Returns copies of songs with spotify_genres filled in from the cache written by enrich_songs.py, or unchanged if the cache doesn't exist yet."""
+    path = Path(cache_path)
+    if not path.exists():
+        return songs
+
+    cache = json.loads(path.read_text())
+    return [replace(song, spotify_genres=cache.get(str(song.id), [])) for song in songs]

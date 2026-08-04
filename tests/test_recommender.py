@@ -7,6 +7,7 @@ from src.recommender import (
     UserProfile,
     Recommender,
     load_songs,
+    load_songs_as_objects,
     score_song,
     recommend_songs,
     _score_song_for_user,
@@ -124,9 +125,22 @@ def test_explain_recommendation_returns_non_empty_string():
 def test_load_songs_returns_expected_number_of_songs():
     songs = load_songs(str(SONGS_CSV_PATH))
 
-    assert len(songs) == 20
-    assert songs[0]["title"] == "Sunrise City"
+    assert len(songs) == 100
+    assert songs[0]["title"] == "Bohemian Rhapsody"
     assert isinstance(songs[0]["energy"], float)
+
+
+def test_load_songs_as_objects_returns_song_instances_with_empty_spotify_genres():
+    songs = load_songs_as_objects(str(SONGS_CSV_PATH))
+
+    assert len(songs) == 100
+    assert all(isinstance(song, Song) for song in songs)
+    assert songs[0].title == "Bohemian Rhapsody"
+    assert isinstance(songs[0].energy, float)
+    assert songs[0].spotify_genres == []
+    # aggregate stat columns (likes/skips/playlist_adds/play_count) have no home on Song
+    assert not hasattr(songs[0], "likes")
+    assert not hasattr(songs[0], "play_count")
 
 
 def test_score_song_perfect_match_scores_one():

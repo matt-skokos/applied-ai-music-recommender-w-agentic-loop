@@ -210,6 +210,12 @@ def load_songs(csv_path: str) -> List[Dict]:
     print(f'Loaded {len(songs)} number of songs successfully.')
     return songs
 
+_SONG_FIELDS = {"id", "title", "artist", "genre", "mood", "energy", "tempo_bpm", "valence", "danceability", "acousticness"}
+
+def load_songs_as_objects(csv_path: str) -> List[Song]:
+    """Loads songs.csv into Song objects for the OOP path (Recommender, rebuild_pool, interpret_feedback); spotify_genres defaults to empty until merged with a genre cache."""
+    return [Song(**{k: v for k, v in row.items() if k in _SONG_FIELDS}) for row in load_songs(csv_path)]
+
 def _as_favorite_set(value) -> Set[str]:
     """Normalizes a genre/mood preference (None, str, or collection) into a
     set."""

@@ -3,10 +3,22 @@ Covers the search -> artist genres -> skip chain in spotify_client.py.
 Network calls are always mocked; no real Spotify credentials needed.
 """
 
+import json
+
 import pytest
 
 import src.spotify_client as spotify_client
+from src.recommender import Song
 from src.session import LogStatus
+
+
+def _make_song(**overrides) -> Song:
+    song = dict(
+        id=1, title="Test", artist="A", genre="pop", mood="happy",
+        energy=0.8, tempo_bpm=120, valence=0.8, danceability=0.8, acousticness=0.2,
+    )
+    song.update(overrides)
+    return Song(**song)
 
 
 class _FakeResponse:
@@ -123,3 +135,25 @@ def test_fetch_song_genres_error_on_exception(monkeypatch):
     assert genres == []
     assert status == LogStatus.ERROR
     assert detail["reason"] == "network timeout"
+
+
+def test_apply_genre_cache_merges_matching_entries(tmp_path):
+    cache_path = tmp_path / "genres.json"
+    cache_path.write_text(json.dumps({"1": ["dream pop", "chillwave"], "2": []}))
+    song_with_genres = _make_song(id=1)
+    song_without_match = _make_song(id=99)  # not present in the cache
+
+    result = spotify_client.apply_genre_cache([song_with_genres, song_without_match], str(cache_path))
+
+    assert result[0].spotify_genres == ["dream pop", "chillwave"]
+    assert result[1].spotify_genres == []
+    assert song_with_genres.spotify_genres == []  # original left untouched
+
+
+def test_apply_genre_cache_missing_file_is_a_noop(tmp_path):
+    song = _make_song(id=1)
+    missing_path = tmp_path / "does_not_exist.json"
+
+    result = spotify_client.apply_genre_cache([song], str(missing_path))
+
+    assert result == [song]

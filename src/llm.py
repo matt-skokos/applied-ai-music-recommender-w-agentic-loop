@@ -52,7 +52,8 @@ def _build_prompt(session: RecommendationSession) -> Optional[str]:
 
 
 def generate_transparency_message(session: RecommendationSession) -> Optional[str]:
-    """Asks Gemini for a one-sentence transparency message, returning None if there's nothing to report yet or the call fails."""
+    """Asks Gemini for a one-sentence transparency message, returning None if
+    there's nothing to report yet or the call fails."""
     prompt = _build_prompt(session)
     if prompt is None:
         return None
@@ -67,7 +68,9 @@ def generate_transparency_message(session: RecommendationSession) -> Optional[st
 
 
 def build_transparency_message(session: RecommendationSession) -> "tuple[Optional[str], LogEntry]":
-    """Generates the round's transparency message and its LogEntry, logging OK for 'no feedback yet' but ERROR (message skipped) for a failed Gemini call."""
+    """Generates the round's transparency message and its LogEntry, logging OK
+    for 'no feedback yet' but ERROR (message skipped) for a failed Gemini
+    call."""
     has_signal = bool(session.facet_weights.heaviest(1))
     message = generate_transparency_message(session)
 

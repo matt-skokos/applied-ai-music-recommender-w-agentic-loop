@@ -140,17 +140,17 @@ def test_gap_no_artist_diversity_control():
     """
     Songs are scored independently with no penalty for repeated artists, so
     a taste profile that matches one artist's style closely can return a
-    top-3 dominated by that single artist (Wildgrass Trio supplies both
-    folk tracks in the catalog).
+    top-3 dominated by that single artist (Miles Davis supplies both "So
+    What" and "All Blues" in the catalog, both mellow modal jazz).
     """
     songs = load_songs(str(SONGS_CSV_PATH))
-    prefs = dict(genre="folk", mood="nostalgic", energy=0.38, tempo=0.25,
-                 valence=0.58, danceability=0.47, acousticness=0.85)
+    prefs = dict(genre="jazz", mood="relaxed", energy=0.38, tempo=0.34,
+                 valence=0.45, danceability=0.40, acousticness=0.75)
 
     recommendations = recommend_songs(prefs, songs, k=3)
     artists = [song["artist"] for song, _, _ in recommendations]
 
-    assert artists.count("Wildgrass Trio") >= 2
+    assert artists.count("Miles Davis") >= 2
 
 
 def test_gap_liking_every_genre_erases_genres_discriminative_power():
