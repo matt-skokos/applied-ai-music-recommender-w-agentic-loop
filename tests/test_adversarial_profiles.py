@@ -76,8 +76,8 @@ def test_gap_none_value_silently_shadows_favorite_genres():
     score_intended, reasons_intended = score_song(prefs_intended, song)
 
     assert score_intended - score_shadowed == pytest.approx(W_GENRE + W_MOOD)
-    assert not any("favorite genre" in r for r in reasons_shadowed)
-    assert any("favorite genre" in r for r in reasons_intended)
+    assert not any("favorite genre" in text for text, _ in reasons_shadowed)
+    assert any("favorite genre" in text for text, _ in reasons_intended)
 
 
 def test_gap_unnormalized_tempo_breaks_score_bounds():
@@ -133,7 +133,7 @@ def test_gap_contradictory_mood_and_energy_still_scores_perfectly():
     score, reasons = score_song(prefs, song)
 
     assert score == pytest.approx(1.0)
-    assert any("favorite mood (chill)" in r for r in reasons)
+    assert any("favorite mood (chill)" in text for text, _ in reasons)
 
 
 def test_gap_no_artist_diversity_control():

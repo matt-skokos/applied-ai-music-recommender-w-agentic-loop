@@ -1,0 +1,153 @@
+"""
+Per-session state and logging for the agentic feedback loop (see
+assets/design_spec.md). Facet weights are per-query only -- nothing here
+persists across sessions.
+"""
+
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Dict, List, Optional, Set
+
+# recommender.py has no cross-module imports of its own yet, so there's no
+# precedent in this repo for which import style wins -- main.py/compare_profiles.py
+# run flat (cwd=src/), tests import via the src.* package. Support both.
+try:
+    from recommender import Facet, Reason, Song, UserProfile
+except ImportError:
+    from src.recommender import Facet, Reason, Song, UserProfile
+
+
+class FeedbackType(str, Enum):
+    UP = "up"
+    DOWN = "down"
+
+
+@dataclass
+class FacetWeights:
+    # continuous facets: additive deltas applied to the user's base targets
+    target_energy_delta: float = 0.0
+    target_tempo_delta: float = 0.0
+    target_valence_delta: float = 0.0
+    target_danceability_delta: float = 0.0
+    target_acousticness_delta: float = 0.0
+
+    # categorical facets: per-label weight, +boost / -penalty
+    genre_boosts: Dict[str, float] = field(default_factory=dict)
+    mood_boosts: Dict[str, float] = field(default_factory=dict)
+
+    def heaviest(self, n: int = 2) -> List[tuple]:
+        """Top-n facets by absolute weight -- feeds the transparency message."""
+        continuous = {
+            "energy": self.target_energy_delta,
+            "tempo": self.target_tempo_delta,
+            "valence": self.target_valence_delta,
+            "danceability": self.target_danceability_delta,
+            "acousticness": self.target_acousticness_delta,
+        }
+        combined = {**continuous, **self.genre_boosts, **self.mood_boosts}
+        touched = {k: v for k, v in combined.items() if v != 0.0}
+        return sorted(touched.items(), key=lambda kv: abs(kv[1]), reverse=True)[:n]
+
+
+@dataclass
+class FeedbackEvent:
+    song_id: int
+    feedback: FeedbackType
+    matched_facets: List[Facet]
+    round_number: int
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass
+class RecommendationSession:
+    session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    base_user: Optional[UserProfile] = None
+    facet_weights: FacetWeights = field(default_factory=FacetWeights)
+    excluded_song_ids: Set[int] = field(default_factory=set)
+    feedback_history: List[FeedbackEvent] = field(default_factory=list)
+    round_number: int = 1
+    max_rounds: int = 5
+
+
+class LogStep(str, Enum):
+    RETRIEVE_FACETS = "retrieve_facets"
+    BUILD_TOPK = "build_topk"
+    COLLECT_FEEDBACK = "collect_feedback"
+    INTERPRET = "interpret"
+    TRANSPARENCY_MESSAGE = "transparency_message"
+    REBUILD_POOL = "rebuild_pool"
+    RELAX_CONSTRAINT = "relax_constraint"
+    OOPS_NO_RESULTS = "oops_no_results"
+    PRESENT_FINAL = "present_final"
+
+
+class LogStatus(str, Enum):
+    OK = "ok"
+    FALLBACK = "fallback"
+    ERROR = "error"
+
+
+@dataclass
+class LogEntry:
+    session_id: str
+    round_number: int
+    step: LogStep
+    status: LogStatus
+    detail: dict
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+_FACET_STEP = 0.15
+
+
+def interpret_feedback(
+    session: RecommendationSession,
+    song: Song,
+    reasons: List[Reason],
+    feedback: FeedbackType,
+) -> LogEntry:
+    """
+    Nudges session.facet_weights from the facets _score_song_for_user()
+    actually tagged on this song -- no string matching against reason text,
+    since `reasons` already carries the Facet each entry came from.
+    """
+    direction = 1.0 if feedback == FeedbackType.UP else -1.0
+    touched: List[Facet] = []
+
+    for _text, facet in reasons:
+        if facet is None:
+            continue
+        if facet == Facet.GENRE:
+            session.facet_weights.genre_boosts[song.genre] = (
+                session.facet_weights.genre_boosts.get(song.genre, 0.0) + direction * _FACET_STEP
+            )
+        elif facet == Facet.MOOD:
+            session.facet_weights.mood_boosts[song.mood] = (
+                session.facet_weights.mood_boosts.get(song.mood, 0.0) + direction * _FACET_STEP
+            )
+        else:
+            attr = f"target_{facet.value}_delta"
+            setattr(session.facet_weights, attr, getattr(session.facet_weights, attr) + direction * _FACET_STEP)
+        touched.append(facet)
+
+    if feedback == FeedbackType.DOWN:
+        session.excluded_song_ids.add(song.id)
+
+    session.feedback_history.append(
+        FeedbackEvent(
+            song_id=song.id,
+            feedback=feedback,
+            matched_facets=touched,
+            round_number=session.round_number,
+        )
+    )
+
+    return LogEntry(
+        session_id=session.session_id,
+        round_number=session.round_number,
+        step=LogStep.INTERPRET,
+        status=LogStatus.OK,
+        detail={"song_id": song.id, "feedback": feedback.value, "facets_touched": [f.value for f in touched]},
+    )

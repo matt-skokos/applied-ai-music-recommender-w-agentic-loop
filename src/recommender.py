@@ -1,7 +1,23 @@
 import csv
 import heapq
+from enum import Enum
 from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass, field
+
+
+class Facet(str, Enum):
+    """Tags a scoring reason with the dimension it came from, so callers can
+    act on *which* facet mattered without re-parsing reason text."""
+    GENRE = "genre"
+    MOOD = "mood"
+    ENERGY = "energy"
+    TEMPO = "tempo"
+    VALENCE = "valence"
+    DANCEABILITY = "danceability"
+    ACOUSTICNESS = "acousticness"
+
+
+Reason = Tuple[str, Optional[Facet]]
 
 # Scoring weights, in priority order: genre > mood > energy > tempo > valence > danceability > acousticness
 W_GENRE = 0.30
@@ -75,11 +91,16 @@ def _score(
     target_acousticness: float,
     genre_label: str,
     mood_label: str,
-) -> Tuple[float, List[str]]:
+) -> Tuple[float, List[Reason]]:
     """
     Shared scoring core used by both the OOP (Song/UserProfile) and
     functional (dict-based) recommendation paths, so the weights and
     formula only live in one place.
+
+    Each reason is tagged with the Facet it came from (or None for the
+    catch-all), so callers that need to act on *which* facet mattered
+    (e.g. nudging session weights from feedback) don't have to re-parse
+    reason text against a separately maintained string->Facet mapping.
     """
     tempo_sim = 1 - abs(target_tempo - _normalize_tempo(tempo_bpm))
     energy_sim = 1 - abs(target_energy - energy)
@@ -97,21 +118,27 @@ def _score(
         + W_ACOUSTICNESS * acoustic_sim
     )
 
-    reasons = []
+    reasons: List[Reason] = []
     if genre_match:
-        reasons.append(f"matches your favorite genre ({genre_label})")
+        reasons.append((f"matches your favorite genre ({genre_label})", Facet.GENRE))
     if mood_match:
-        reasons.append(f"matches your favorite mood ({mood_label})")
+        reasons.append((f"matches your favorite mood ({mood_label})", Facet.MOOD))
     if energy_sim >= 0.85:
-        reasons.append("energy closely matches your taste")
+        reasons.append(("energy closely matches your taste", Facet.ENERGY))
     if tempo_sim >= 0.85:
-        reasons.append("tempo closely matches your taste")
+        reasons.append(("tempo closely matches your taste", Facet.TEMPO))
+    if valence_sim >= 0.85:
+        reasons.append(("valence closely matches your taste", Facet.VALENCE))
+    if dance_sim >= 0.85:
+        reasons.append(("danceability closely matches your taste", Facet.DANCEABILITY))
+    if acoustic_sim >= 0.85:
+        reasons.append(("acousticness closely matches your taste", Facet.ACOUSTICNESS))
     if not reasons:
-        reasons.append("a reasonable overall match to your taste profile")
+        reasons.append(("a reasonable overall match to your taste profile", None))
 
     return score, reasons
 
-def _score_song_for_user(user: UserProfile, song: Song) -> Tuple[float, List[str]]:
+def _score_song_for_user(user: UserProfile, song: Song) -> Tuple[float, List[Reason]]:
     """Adapts a Song/UserProfile pair into the shared _score() scoring core."""
     return _score(
         genre_match=song.genre in user.favorite_genres,
@@ -146,7 +173,7 @@ class Recommender:
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
         """Returns a human-readable string explaining why the song was recommended."""
         _, reasons = _score_song_for_user(user, song)
-        return "; ".join(reasons)
+        return "; ".join(text for text, _ in reasons)
 
 def load_songs(csv_path: str) -> List[Dict]:
     """
@@ -184,7 +211,7 @@ def _as_favorite_set(value) -> Set[str]:
         return {value}
     return set(value)
 
-def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
+def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[Reason]]:
     """
     Scores a single song against user preferences.
     Required by recommend_songs() and src/main.py
@@ -217,5 +244,5 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     scored = []
     for song in songs:
         score, reasons = score_song(user_prefs, song)
-        scored.append((song, score, "; ".join(reasons)))
+        scored.append((song, score, "; ".join(text for text, _ in reasons)))
     return heapq.nlargest(k, scored, key=lambda item: item[1])

@@ -1,0 +1,169 @@
+classDiagram
+    direction LR
+
+    namespace recommender_py {
+        class Song
+        class UserProfile
+        class Recommender
+        class Facet
+        class ScoringCore
+    }
+
+    namespace session_py {
+        class FeedbackType
+        class FacetWeights
+        class FeedbackEvent
+        class RecommendationSession
+        class LogStep
+        class LogStatus
+        class LogEntry
+        class SessionLoop
+    }
+
+    namespace llm_py {
+        class TransparencyMessenger
+    }
+
+    class Song {
+        +int id
+        +str title
+        +str artist
+        +str genre
+        +str mood
+        +float energy
+        +float tempo_bpm
+        +float valence
+        +float danceability
+        +float acousticness
+    }
+
+    class UserProfile {
+        +str user_id
+        +Set~str~ favorite_genres
+        +Set~str~ favorite_moods
+        +float target_energy
+        +float target_valence
+        +float target_danceability
+        +float target_acousticness
+        +float target_tempo
+        +Set~int~ likes
+        +Dict~int,int~ skips
+        +Set~int~ playlist_adds
+        +Dict~int,int~ play_counts
+    }
+
+    class Recommender {
+        +List~Song~ songs
+        +recommend(user, k) List~Song~
+        +explain_recommendation(user, song) str
+    }
+
+    class Facet {
+        <<enumeration>>
+        GENRE
+        MOOD
+        ENERGY
+        TEMPO
+        VALENCE
+        DANCEABILITY
+        ACOUSTICNESS
+    }
+
+    class ScoringCore {
+        <<module>>
+        _score(...) tuple
+        _score_song_for_user(user, song) tuple
+        score_song(user_prefs, song) tuple
+        recommend_songs(user_prefs, songs, k) list
+        load_songs(csv_path) list
+    }
+
+    class FeedbackType {
+        <<enumeration>>
+        UP
+        DOWN
+    }
+
+    class FacetWeights {
+        +float target_energy_delta
+        +float target_tempo_delta
+        +float target_valence_delta
+        +float target_danceability_delta
+        +float target_acousticness_delta
+        +Dict~str,float~ genre_boosts
+        +Dict~str,float~ mood_boosts
+        +heaviest(n) list
+    }
+
+    class FeedbackEvent {
+        +int song_id
+        +int round_number
+        +datetime timestamp
+    }
+
+    class RecommendationSession {
+        +str session_id
+        +Set~int~ excluded_song_ids
+        +int round_number
+        +int max_rounds
+    }
+
+    class LogStep {
+        <<enumeration>>
+        RETRIEVE_FACETS
+        BUILD_TOPK
+        COLLECT_FEEDBACK
+        INTERPRET
+        TRANSPARENCY_MESSAGE
+        REBUILD_POOL
+        RELAX_CONSTRAINT
+        OOPS_NO_RESULTS
+        PRESENT_FINAL
+    }
+
+    class LogStatus {
+        <<enumeration>>
+        OK
+        FALLBACK
+        ERROR
+    }
+
+    class LogEntry {
+        +str session_id
+        +int round_number
+        +dict detail
+        +datetime timestamp
+    }
+
+    class SessionLoop {
+        <<module>>
+        interpret_feedback(session, song, reasons, feedback) LogEntry
+    }
+
+    class TransparencyMessenger {
+        <<module>>
+        generate_transparency_message(session) str
+        build_transparency_message(session) tuple
+    }
+
+    note for ScoringCore "Reason = (text: str, facet: Facet | None)<br/>score_song/recommend_songs = dict-based path<br/>Recommender = OOP path<br/>both funnel through _score()"
+
+    Recommender "1" o-- "*" Song : songs
+    Recommender ..> UserProfile : scores against
+    Recommender ..> ScoringCore : delegates to
+    ScoringCore ..> Facet : tags each reason with
+
+    RecommendationSession "1" *-- "1" FacetWeights : facet_weights
+    RecommendationSession "1" *-- "*" FeedbackEvent : feedback_history
+    RecommendationSession "1" --> "0..1" UserProfile : base_user
+    FeedbackEvent "1" --> "1" FeedbackType : feedback
+    FeedbackEvent "1" --> "*" Facet : matched_facets
+    LogEntry "1" --> "1" LogStep : step
+    LogEntry "1" --> "1" LogStatus : status
+
+    SessionLoop ..> RecommendationSession : nudges weights, adds exclusions
+    SessionLoop ..> ScoringCore : reads Reason tuples from
+    SessionLoop ..> LogEntry : emits
+
+    TransparencyMessenger ..> RecommendationSession : reads facet_weights.heaviest()
+    TransparencyMessenger ..> LogEntry : emits OK/ERROR, no template fallback
