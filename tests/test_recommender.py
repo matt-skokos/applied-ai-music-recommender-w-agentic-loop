@@ -9,6 +9,7 @@ from src.recommender import (
     load_songs,
     score_song,
     recommend_songs,
+    _score_song_for_user,
     W_GENRE,
     W_MOOD,
 )
@@ -154,6 +155,26 @@ def test_genre_match_contributes_exactly_its_weight():
     score_mismatch, _ = score_song(prefs, song_genre_mismatch)
 
     assert score_match - score_mismatch == pytest.approx(W_GENRE)
+
+
+def test_spotify_genres_broadens_genre_match():
+    # CSV genre "rock" doesn't match the user's favorite, but a Spotify-enriched
+    # tag does -- genre_match (and its W_GENRE contribution) should still fire
+    user = UserProfile(user_id="u", favorite_genres={"dream pop"}, favorite_moods={"chill"})
+    unenriched = Song(
+        id=1, title="T", artist="A", genre="rock", mood="chill",
+        energy=0.5, tempo_bpm=120, valence=0.5, danceability=0.5, acousticness=0.5,
+    )
+    enriched = Song(
+        id=2, title="T", artist="A", genre="rock", mood="chill",
+        energy=0.5, tempo_bpm=120, valence=0.5, danceability=0.5, acousticness=0.5,
+        spotify_genres=["dream pop", "shoegaze"],
+    )
+
+    score_unenriched, _ = _score_song_for_user(user, unenriched)
+    score_enriched, _ = _score_song_for_user(user, enriched)
+
+    assert score_enriched - score_unenriched == pytest.approx(W_GENRE)
 
 
 def test_mood_match_contributes_exactly_its_weight():

@@ -49,6 +49,10 @@ class Song:
     valence: float
     danceability: float
     acousticness: float
+    # Spotify-enriched genre tags (src/spotify_client.py), usually finer-grained
+    # than `genre` above -- e.g. ["dream pop", "chillwave"] vs "lofi". Empty
+    # when enrichment found no match or the artist has no Spotify genres.
+    spotify_genres: List[str] = field(default_factory=list)
 
 @dataclass
 class UserProfile:
@@ -140,8 +144,11 @@ def _score(
 
 def _score_song_for_user(user: UserProfile, song: Song) -> Tuple[float, List[Reason]]:
     """Adapts a Song/UserProfile pair into the shared _score() scoring core."""
+    genre_match = song.genre in user.favorite_genres or any(
+        g in user.favorite_genres for g in song.spotify_genres
+    )
     return _score(
-        genre_match=song.genre in user.favorite_genres,
+        genre_match=genre_match,
         mood_match=song.mood in user.favorite_moods,
         energy=song.energy,
         tempo_bpm=song.tempo_bpm,
@@ -204,7 +211,8 @@ def load_songs(csv_path: str) -> List[Dict]:
     return songs
 
 def _as_favorite_set(value) -> Set[str]:
-    """Normalizes a genre/mood preference (None, str, or collection) into a set."""
+    """Normalizes a genre/mood preference (None, str, or collection) into a
+    set."""
     if value is None:
         return set()
     if isinstance(value, str):

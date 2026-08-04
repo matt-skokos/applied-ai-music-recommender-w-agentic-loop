@@ -4,19 +4,20 @@ assets/design_spec.md). Facet weights are per-query only -- nothing here
 persists across sessions.
 """
 
+import heapq
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 # recommender.py has no cross-module imports of its own yet, so there's no
 # precedent in this repo for which import style wins -- main.py/compare_profiles.py
 # run flat (cwd=src/), tests import via the src.* package. Support both.
 try:
-    from recommender import Facet, Reason, Song, UserProfile
+    from recommender import Facet, Reason, Song, UserProfile, _score_song_for_user
 except ImportError:
-    from src.recommender import Facet, Reason, Song, UserProfile
+    from src.recommender import Facet, Reason, Song, UserProfile, _score_song_for_user
 
 
 class FeedbackType(str, Enum):
@@ -151,3 +152,50 @@ def interpret_feedback(
         status=LogStatus.OK,
         detail={"song_id": song.id, "feedback": feedback.value, "facets_touched": [f.value for f in touched]},
     )
+
+
+def _apply_facet_weights(base_user: UserProfile, weights: FacetWeights) -> UserProfile:
+    """Returns a copy of base_user with each continuous target shifted by its delta and clamped to [0.0, 1.0]."""
+    def _shifted(value: float, delta: float) -> float:
+        return max(0.0, min(1.0, value + delta))
+
+    return replace(
+        base_user,
+        target_energy=_shifted(base_user.target_energy, weights.target_energy_delta),
+        target_tempo=_shifted(base_user.target_tempo, weights.target_tempo_delta),
+        target_valence=_shifted(base_user.target_valence, weights.target_valence_delta),
+        target_danceability=_shifted(base_user.target_danceability, weights.target_danceability_delta),
+        target_acousticness=_shifted(base_user.target_acousticness, weights.target_acousticness_delta),
+    )
+
+
+def rebuild_pool(
+    session: RecommendationSession,
+    songs: List[Song],
+    k: int = 5,
+) -> Tuple[List[Tuple[Song, float, List[Reason]]], LogEntry]:
+    """Re-scores non-excluded songs against the session's shifted targets plus genre/mood boosts, returning the next round's top-k with reasons."""
+    candidates = [song for song in songs if song.id not in session.excluded_song_ids]
+    effective_user = _apply_facet_weights(session.base_user, session.facet_weights)
+
+    scored = []
+    for song in candidates:
+        score, reasons = _score_song_for_user(effective_user, song)
+        score += session.facet_weights.genre_boosts.get(song.genre, 0.0)
+        score += session.facet_weights.mood_boosts.get(song.mood, 0.0)
+        scored.append((song, score, reasons))
+
+    top_k = heapq.nlargest(k, scored, key=lambda item: item[1])
+
+    log = LogEntry(
+        session_id=session.session_id,
+        round_number=session.round_number,
+        step=LogStep.REBUILD_POOL,
+        status=LogStatus.OK,
+        detail={
+            "candidate_count": len(candidates),
+            "excluded_count": len(songs) - len(candidates),
+            "served": len(top_k),
+        },
+    )
+    return top_k, log

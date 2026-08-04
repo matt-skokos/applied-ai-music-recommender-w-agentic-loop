@@ -3,3 +3,4 @@ pytest
 streamlit
 google-genai
 python-dotenv
+requests

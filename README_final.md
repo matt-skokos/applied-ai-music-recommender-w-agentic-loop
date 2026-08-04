@@ -38,9 +38,13 @@ This project is built off of the original Music Recommendation app that we desig
 
 ```bash
 pip install -r requirements.txt
+'''
+3. You will need to provide a GEMINI api key.
+   create a *.env file in the main directory ( don't forget to .gitignore it!)
+   The project LLM should be wired up fine after this step.
 ```
-
-3. Run the app:
+'''
+4. Run the app:
 
 ```bash
 python -m src.main
