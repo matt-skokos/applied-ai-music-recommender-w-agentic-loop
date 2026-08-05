@@ -143,7 +143,7 @@ def _score(
     return score, reasons
 
 def _score_song_for_user(user: UserProfile, song: Song) -> Tuple[float, List[Reason]]:
-    """Adapts a Song/UserProfile pair into the shared _score() scoring core."""
+    """Adapts a Song/UserProfile pair into the shared _score() scoring core, broadening genre_match to include the song's Spotify-enriched genres."""
     genre_match = song.genre in user.favorite_genres or any(
         g in user.favorite_genres for g in song.spotify_genres
     )

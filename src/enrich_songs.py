@@ -16,6 +16,7 @@ CACHE_PATH = Path("../data/spotify_genres_cache.json")
 
 
 def main() -> None:
+    """Fetches Spotify genres for every song in the catalog and writes the results to the cache file."""
     songs = load_songs(SONGS_CSV_PATH)
 
     print(f"Looking through Spotify data for {len(songs)} songs' genres...\n")

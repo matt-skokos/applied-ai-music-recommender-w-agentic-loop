@@ -121,7 +121,7 @@ def handle_feedback(song: Song, reasons, feedback: FeedbackType, catalog: list[S
 
 
 def render_playlist_section(catalog: list[Song]) -> None:
-    """Renders the Generate Playlist button, the current top-k with thumbs up/down, and the transparency message."""
+    """Renders the Generate Playlist button, the transparency message, the agent's refinement log, and the current top-k with thumbs up/down."""
     st.subheader("Your playlist")
 
     if st.session_state.user_profile is None:
@@ -178,6 +178,7 @@ def render_playlist_section(catalog: list[Song]) -> None:
 
 
 def main() -> None:
+    """Entry point: sets up page/session state, then renders the profile form, catalog browser, and playlist section."""
     st.set_page_config(page_title="SongSeek", layout="wide")
     st.title("SongSeek")
 

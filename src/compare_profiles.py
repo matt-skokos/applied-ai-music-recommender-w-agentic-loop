@@ -36,6 +36,7 @@ def _row_to_prefs(row: dict) -> dict:
 
 
 def main() -> None:
+    """Prints top-5 recommendations for each "diverse" profile in user_profiles.csv, side by side."""
     songs = load_songs(SONGS_CSV_PATH)
 
     with open(PROFILES_CSV_PATH, newline="") as f:

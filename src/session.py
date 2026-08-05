@@ -182,6 +182,7 @@ def interpret_feedback(
 def _apply_facet_weights(base_user: UserProfile, weights: FacetWeights) -> UserProfile:
     """Returns a copy of base_user with each continuous target shifted by its delta and clamped to [0.0, 1.0]."""
     def _shifted(value: float, delta: float) -> float:
+        """Clamps value + delta into [0.0, 1.0]."""
         return max(0.0, min(1.0, value + delta))
 
     return replace(

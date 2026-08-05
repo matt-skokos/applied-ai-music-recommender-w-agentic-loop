@@ -84,7 +84,7 @@ def _search_track(title: str, artist: str) -> Optional[dict]:
 
 
 def _artist_genres(artist_id: str) -> List[str]:
-    """Returns the given artist's Spotify genre tags -- often empty, since Spotify doesn't classify every artist."""
+    """Returns the given artist's Spotify genre tags -- frequently empty or absent entirely, per Spotify's ongoing genre-data deprecation (see model_card.md)."""
     response = requests.get(
         f"{_API_BASE}/artists/{artist_id}",
         headers={"Authorization": f"Bearer {_get_access_token()}"},
