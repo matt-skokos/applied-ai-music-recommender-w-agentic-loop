@@ -18,9 +18,10 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from recommender import Song, UserProfile, load_songs_as_objects
-from session import FeedbackType, RecommendationSession, interpret_feedback, rebuild_pool
+from session import FeedbackType, RecommendationSession, interpret_feedback
 from llm import build_transparency_message
 from spotify_client import apply_genre_cache
+from agent_loop import run_agentic_refinement
 
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _SONGS_CSV_PATH = _DATA_DIR / "songs.csv"
@@ -56,6 +57,24 @@ def _reset_playlist_view() -> None:
     st.session_state.show_more_clicks = 0
 
 
+def _format_step(step: dict) -> str:
+    """Renders one agent decision as a single readable line for the live status log and the persistent expander."""
+    label = f" ({step['label']})" if step.get("label") else ""
+    return f"Iteration {step['iteration']}: {step['direction']} {step['facet']}{label} -- {step['rationale']}"
+
+
+def _run_refinement(session: RecommendationSession, catalog: list[Song]) -> None:
+    """Runs the autonomous agentic refinement pass with live progress, then stores the resulting playlist and decision log."""
+    with st.status("Agent refining your playlist...", expanded=True) as status:
+        topk, agent_log = run_agentic_refinement(
+            session, catalog, k=_MAX_K, on_step=lambda step: status.write(_format_step(step)),
+        )
+        status.update(label=f"Agent finished after {len(agent_log)} step(s)", state="complete")
+    st.session_state.current_topk = topk
+    st.session_state.agent_log = agent_log
+    _reset_playlist_view()
+
+
 def render_profile_form(catalog: list[Song]) -> None:
     """Renders the taste-profile form; saves a UserProfile to session_state on submit."""
     genres = sorted({s.genre for s in catalog})
@@ -87,18 +106,18 @@ def render_profile_form(catalog: list[Song]) -> None:
             st.session_state.session = None
             st.session_state.current_topk = None
             st.session_state.transparency_message = None
+            st.session_state.agent_log = None
             _reset_playlist_view()
 
 
 def handle_feedback(song: Song, reasons, feedback: FeedbackType, catalog: list[Song]) -> None:
-    """Applies one thumbs up/down: nudges weights, gets the transparency message, rebuilds the next round's top-k."""
+    """Applies one thumbs up/down, gets the transparency message, then lets the agent autonomously refine the next round's top-k."""
     session = st.session_state.session
     interpret_feedback(session, song, reasons, feedback)
     session.round_number += 1
     message, _log = build_transparency_message(session)
     st.session_state.transparency_message = message
-    st.session_state.current_topk, _log = rebuild_pool(session, catalog, k=_MAX_K)
-    _reset_playlist_view()
+    _run_refinement(session, catalog)
 
 
 def render_playlist_section(catalog: list[Song]) -> None:
@@ -112,12 +131,16 @@ def render_playlist_section(catalog: list[Song]) -> None:
     if st.button("Generate playlist"):
         if st.session_state.session is None:
             st.session_state.session = RecommendationSession(base_user=st.session_state.user_profile)
-        st.session_state.current_topk, _log = rebuild_pool(st.session_state.session, catalog, k=_MAX_K)
         st.session_state.transparency_message = None
-        _reset_playlist_view()
+        _run_refinement(st.session_state.session, catalog)
 
     if st.session_state.transparency_message:
         st.info(st.session_state.transparency_message)
+
+    if st.session_state.agent_log:
+        with st.expander(f"How the agent refined this list ({len(st.session_state.agent_log)} steps)"):
+            for step in st.session_state.agent_log:
+                st.write(_format_step(step))
 
     topk = st.session_state.current_topk
     if topk is None:
@@ -163,6 +186,7 @@ def main() -> None:
         st.session_state.session = None
         st.session_state.current_topk = None
         st.session_state.transparency_message = None
+        st.session_state.agent_log = None
         _reset_playlist_view()
 
     catalog = load_catalog()
@@ -177,6 +201,7 @@ def main() -> None:
         st.session_state.session = None
         st.session_state.current_topk = None
         st.session_state.transparency_message = None
+        st.session_state.agent_log = None
         _reset_playlist_view()
         st.rerun()
 
