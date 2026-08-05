@@ -99,6 +99,8 @@ Prompts:
 - Cases where the system overfits to one preference  
 - Ways the scoring might unintentionally favor some users  
 
+- **Spotify enrichment can't deliver what it was designed for, and that's a platform problem, not a code problem.** The original plan was to enrich songs with real Spotify data in two ways: continuous audio features (energy/tempo/valence/danceability/acousticness) as the primary signal, with artist genre tags as a fallback. Both are now effectively dead against the live API. Spotify cut off Audio Features access for new developer apps on Nov 27, 2024, and their 2025 Developer Mode changes explicitly bar this class of app from track structure/rhythm/characteristics data entirely. So the fallback became genre-only enrichment instead. That's dead too: I confirmed directly that `GET /artists/{id}` for Queen — an enormously famous, definitely-classified artist — returns a valid `200 OK` with no `genres` field on the response at all, not even an empty array. This matches independently-reported developer complaints of Spotify actively stripping artist genre data since March 2025 (one tracked case saw unique genres drop from 1,138 to 373 across the same artist set). The enrichment code (`src/spotify_client.py`) is built, tested, and runs correctly end-to-end — it's just enriching against a data source that no longer has the data. It's left in place rather than ripped out, in case Spotify ever restores genre classification.
+
 ---
 
 ## 7. Evaluation  
