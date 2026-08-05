@@ -73,9 +73,11 @@ def test_interpret_feedback_records_feedback_event_with_matched_facets():
     assert Facet.GENRE in event.matched_facets
 
 
-def test_interpret_feedback_ignores_catchall_reason_with_no_facet():
+def test_interpret_feedback_still_nudges_continuous_facets_with_no_genre_or_mood_match():
     # every continuous similarity held below the 0.85 reason threshold, and
-    # genre/mood both mismatched, so _score() emits only the None-facet catch-all
+    # genre/mood both mismatched, so _score() emits only the None-facet catch-all --
+    # continuous facets should still get nudged toward the song's own values,
+    # even though none of them were "close" enough to be a reason
     song = _make_song(
         genre="rock", mood="sad",
         energy=0.7, tempo_bpm=144.0, valence=0.7, danceability=0.7, acousticness=0.7,
@@ -91,8 +93,10 @@ def test_interpret_feedback_ignores_catchall_reason_with_no_facet():
 
     log = interpret_feedback(session, song, reasons, FeedbackType.UP)
 
-    assert log.detail["facets_touched"] == []
-    assert session.facet_weights.heaviest(5) == []
+    assert set(log.detail["facets_touched"]) == {"energy", "tempo", "valence", "danceability", "acousticness"}
+    assert session.facet_weights.target_energy_delta > 0  # nudged toward the song's higher energy (0.7 > 0.5)
+    assert session.facet_weights.genre_boosts == {}  # genre never matched, so no genre boost
+    assert session.facet_weights.mood_boosts == {}  # mood never matched, so no mood boost
 
 
 def test_apply_facet_weights_shifts_and_clamps_continuous_targets():

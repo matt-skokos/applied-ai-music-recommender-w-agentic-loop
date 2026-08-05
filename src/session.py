@@ -15,9 +15,9 @@ from typing import Dict, List, Optional, Set, Tuple
 # precedent in this repo for which import style wins -- main.py/compare_profiles.py
 # run flat (cwd=src/), tests import via the src.* package. Support both.
 try:
-    from recommender import Facet, Reason, Song, UserProfile, _score_song_for_user
+    from recommender import Facet, Reason, Song, UserProfile, _normalize_tempo, _score_song_for_user
 except ImportError:
-    from src.recommender import Facet, Reason, Song, UserProfile, _score_song_for_user
+    from src.recommender import Facet, Reason, Song, UserProfile, _normalize_tempo, _score_song_for_user
 
 
 class FeedbackType(str, Enum):
@@ -102,6 +102,21 @@ class LogEntry:
 
 _FACET_STEP = 0.15
 
+_CONTINUOUS_FACETS = (Facet.ENERGY, Facet.TEMPO, Facet.VALENCE, Facet.DANCEABILITY, Facet.ACOUSTICNESS)
+
+
+def _song_value_for_facet(song: Song, facet: Facet) -> float:
+    """Reads a song's own value for a continuous facet, normalizing tempo_bpm to the same 0-1 scale as the rest."""
+    if facet == Facet.TEMPO:
+        return _normalize_tempo(song.tempo_bpm)
+    return getattr(song, facet.value)
+
+
+def _effective_target_for_facet(base_user: UserProfile, weights: FacetWeights, facet: Facet) -> float:
+    """Returns the session's current target for a continuous facet: the base user's value plus its accumulated delta."""
+    attr = f"target_{facet.value}"
+    return getattr(base_user, attr) + getattr(weights, f"{attr}_delta")
+
 
 def interpret_feedback(
     session: RecommendationSession,
@@ -110,28 +125,38 @@ def interpret_feedback(
     feedback: FeedbackType,
 ) -> LogEntry:
     """
-    Nudges session.facet_weights from the facets _score_song_for_user()
-    actually tagged on this song -- no string matching against reason text,
-    since `reasons` already carries the Facet each entry came from.
+    Nudges session.facet_weights from this song's feedback: every continuous
+    facet's target always moves toward (or away from) the song's own value,
+    proportional to how far apart they are -- gating this on whether the
+    facet already counted as "close" meant a song whose own features never
+    crossed the reason threshold could never be pulled toward, even after
+    repeated positive feedback. Genre/mood boosts stay tied to whether
+    _score_song_for_user() actually tagged a genre/mood match.
     """
     direction = 1.0 if feedback == FeedbackType.UP else -1.0
     touched: List[Facet] = []
 
+    for facet in _CONTINUOUS_FACETS:
+        song_value = _song_value_for_facet(song, facet)
+        effective_target = _effective_target_for_facet(session.base_user, session.facet_weights, facet)
+        attr = f"target_{facet.value}_delta"
+        setattr(
+            session.facet_weights, attr,
+            getattr(session.facet_weights, attr) + direction * _FACET_STEP * (song_value - effective_target),
+        )
+        touched.append(facet)
+
     for _text, facet in reasons:
-        if facet is None:
-            continue
         if facet == Facet.GENRE:
             session.facet_weights.genre_boosts[song.genre] = (
                 session.facet_weights.genre_boosts.get(song.genre, 0.0) + direction * _FACET_STEP
             )
+            touched.append(facet)
         elif facet == Facet.MOOD:
             session.facet_weights.mood_boosts[song.mood] = (
                 session.facet_weights.mood_boosts.get(song.mood, 0.0) + direction * _FACET_STEP
             )
-        else:
-            attr = f"target_{facet.value}_delta"
-            setattr(session.facet_weights, attr, getattr(session.facet_weights, attr) + direction * _FACET_STEP)
-        touched.append(facet)
+            touched.append(facet)
 
     if feedback == FeedbackType.DOWN:
         session.excluded_song_ids.add(song.id)
