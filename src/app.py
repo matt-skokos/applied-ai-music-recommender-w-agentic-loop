@@ -26,6 +26,9 @@ _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _SONGS_CSV_PATH = _DATA_DIR / "songs.csv"
 _GENRE_CACHE_PATH = _DATA_DIR / "spotify_genres_cache.json"
 _TOP_K = 5
+_SHOW_MORE_STEP = 5
+_MAX_SHOW_MORE_CLICKS = 2
+_MAX_K = _TOP_K + _MAX_SHOW_MORE_CLICKS * _SHOW_MORE_STEP
 
 
 @st.cache_data
@@ -45,6 +48,12 @@ def catalog_dataframe(songs: list[Song]) -> pd.DataFrame:
         }
         for s in songs
     ])
+
+
+def _reset_playlist_view() -> None:
+    """Collapses the visible list back to just the top-k after a new playlist/round -- "show more" starts over each round."""
+    st.session_state.visible_count = _TOP_K
+    st.session_state.show_more_clicks = 0
 
 
 def render_profile_form(catalog: list[Song]) -> None:
@@ -78,6 +87,7 @@ def render_profile_form(catalog: list[Song]) -> None:
             st.session_state.session = None
             st.session_state.current_topk = None
             st.session_state.transparency_message = None
+            _reset_playlist_view()
 
 
 def handle_feedback(song: Song, reasons, feedback: FeedbackType, catalog: list[Song]) -> None:
@@ -87,7 +97,8 @@ def handle_feedback(song: Song, reasons, feedback: FeedbackType, catalog: list[S
     session.round_number += 1
     message, _log = build_transparency_message(session)
     st.session_state.transparency_message = message
-    st.session_state.current_topk, _log = rebuild_pool(session, catalog, k=_TOP_K)
+    st.session_state.current_topk, _log = rebuild_pool(session, catalog, k=_MAX_K)
+    _reset_playlist_view()
 
 
 def render_playlist_section(catalog: list[Song]) -> None:
@@ -101,8 +112,9 @@ def render_playlist_section(catalog: list[Song]) -> None:
     if st.button("Generate playlist"):
         if st.session_state.session is None:
             st.session_state.session = RecommendationSession(base_user=st.session_state.user_profile)
-        st.session_state.current_topk, _log = rebuild_pool(st.session_state.session, catalog, k=_TOP_K)
+        st.session_state.current_topk, _log = rebuild_pool(st.session_state.session, catalog, k=_MAX_K)
         st.session_state.transparency_message = None
+        _reset_playlist_view()
 
     if st.session_state.transparency_message:
         st.info(st.session_state.transparency_message)
@@ -114,18 +126,31 @@ def render_playlist_section(catalog: list[Song]) -> None:
         st.warning("No songs left to recommend -- you've thumbs-downed the whole catalog.")
         return
 
-    st.caption(f"Round {st.session_state.session.round_number}")
-    for song, score, reasons in topk:
+    round_number = st.session_state.session.round_number
+    visible = topk[: st.session_state.visible_count]
+
+    st.caption(f"Round {round_number} -- showing {len(visible)} of {len(topk)}")
+    for song, score, reasons in visible:
         cols = st.columns([5, 1, 1])
         explanation = "; ".join(text for text, _facet in reasons)
         cols[0].markdown(f"**{song.title}** -- {song.artist}  \n"
                           f"_{song.genre}, {song.mood}_ -- score {score:.2f}  \n"
                           f"{explanation}")
-        if cols[1].button("\U0001F44D", key=f"up_{song.id}_{st.session_state.session.round_number}"):
+        if cols[1].button("\U0001F44D", key=f"up_{song.id}_{round_number}"):
             handle_feedback(song, reasons, FeedbackType.UP, catalog)
             st.rerun()
-        if cols[2].button("\U0001F44E", key=f"down_{song.id}_{st.session_state.session.round_number}"):
+        if cols[2].button("\U0001F44E", key=f"down_{song.id}_{round_number}"):
             handle_feedback(song, reasons, FeedbackType.DOWN, catalog)
+            st.rerun()
+
+    can_show_more = (
+        st.session_state.show_more_clicks < _MAX_SHOW_MORE_CLICKS
+        and st.session_state.visible_count < len(topk)
+    )
+    if can_show_more:
+        if st.button(f"Show {_SHOW_MORE_STEP} more"):
+            st.session_state.visible_count = min(st.session_state.visible_count + _SHOW_MORE_STEP, len(topk))
+            st.session_state.show_more_clicks += 1
             st.rerun()
 
 
@@ -138,6 +163,7 @@ def main() -> None:
         st.session_state.session = None
         st.session_state.current_topk = None
         st.session_state.transparency_message = None
+        _reset_playlist_view()
 
     catalog = load_catalog()
 
@@ -151,6 +177,7 @@ def main() -> None:
         st.session_state.session = None
         st.session_state.current_topk = None
         st.session_state.transparency_message = None
+        _reset_playlist_view()
         st.rerun()
 
     render_playlist_section(catalog)
