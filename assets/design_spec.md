@@ -254,3 +254,91 @@ rather than finalized in this spec:
   fallback available). Keeping these distinct makes it easy to show "the
   agent handled N fallbacks gracefully" vs. "M hard errors occurred" in a
   final report.
+
+## 8. Autonomous agentic refinement loop
+
+### Why this exists
+
+Everything through section 7 only ever recalculates in direct response to a
+human click: thumbs up/down → `interpret_feedback()` → `rebuild_pool()`.
+Nothing in the system ever acts on its own — it's reactive recalibration,
+not an agentic loop. This section adds the piece that actually is one: an
+LLM-driven loop that autonomously explores facet-weight adjustments,
+observes the effect on the ranking, and repeats until the ranking
+stabilizes or it hits a hard cap — with no human input required per step.
+
+### Locked-in decisions
+
+- **Randomness comes from real Gemini judgment each iteration, via
+  structured output** (a JSON schema, not free text to parse) — not a
+  deterministic hill-climb search with Gemini only narrating the result
+  afterward. The loop's exploration should feel non-deterministic because
+  an LLM is making the call each time, not because of an explicit random
+  number generator.
+- **Cap: 15 iterations maximum.** Stop early once **3 consecutive
+  iterations produce no change to the top-k** — chosen to give the loop
+  room to actually explore before declaring convergence, rather than
+  stopping the moment two iterations in a row happen to agree.
+- **Runs on every generated list** — this is the new normal, not an
+  optional extra. Both the initial "Generate playlist" action and every
+  round after a thumbs up/down go through this refinement pass before the
+  list is shown. The existing human feedback loop (section 3) still
+  happens exactly as before; the agent simply refines the pool further
+  *before* every list the human sees, on top of whatever the human's own
+  feedback already did.
+- **Per-iteration mechanics reuse `interpret_feedback()`'s existing nudge
+  shape** — continuous facets move `target_{facet}_delta`, categorical
+  facets move `genre_boosts`/`mood_boosts` — just driven by the LLM's
+  chosen facet/direction/magnitude instead of a specific human-voted song's
+  matched facets.
+- **Fail-soft on Gemini errors**, same posture as the rest of the project's
+  LLM/Spotify integrations: if a decision call fails, the loop stops early
+  and returns whatever it has rather than crashing the round.
+- **Explicitly deferred**: having the agent ask the user a clarifying
+  question (e.g. "why do you like this song?") mid-loop. That would block
+  an otherwise-autonomous loop on human text input, which contradicts it
+  running on its own. This is left as a separate, future feature — likely
+  a check-in between rounds rather than a step embedded inside this loop.
+
+### Decision shape (structured output)
+
+Each iteration asks Gemini for exactly one adjustment, returned as
+structured JSON (verified working via
+`google.genai.types.GenerateContentConfig(response_mime_type="application/json", response_schema=...)`):
+
+```python
+{
+    "facet": "energy" | "tempo" | "valence" | "danceability"
+            | "acousticness" | "genre" | "mood",
+    "label": str,        # only meaningful when facet is genre/mood --
+                         # must be one of the labels actually shown to it
+    "direction": "up" | "down",
+    "magnitude": float,  # schema asks for 0.05-0.3; clamp defensively in
+                         # code too -- a live test returned 0.7 despite the
+                         # schema description, so the range must be
+                         # enforced, not just requested
+    "rationale": str,    # one short sentence; may name specific songs
+    "songs_compared": list[str],  # optional, for a richer log
+}
+```
+
+### Loop shape
+
+```mermaid
+flowchart TD
+    A[Rebuild pool with current weights] --> B{Same top-k as<br/>previous iteration?}
+    B -- Yes, 3rd time in a row --> C[Stop: stable]
+    B -- No, or fewer than 3 in a row --> D{Hit 15 iterations?}
+    D -- Yes --> E[Stop: cap reached]
+    D -- No --> F[Ask Gemini for one structured decision]
+    F -- call failed --> C
+    F -- decision received --> G[Apply decision to facet weights]
+    G --> A
+    C --> H[Return final top-k + full decision log]
+    E --> H
+```
+
+See `assets/diagrams/flow_chart_agentic_refinement_draft.mmd` for the
+standalone version of this diagram, and the updated
+`flow_chart_main_loop_draft.mmd` for where this pass sits relative to the
+existing main loop.

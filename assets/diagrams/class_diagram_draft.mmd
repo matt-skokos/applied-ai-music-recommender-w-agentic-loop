@@ -24,6 +24,10 @@ classDiagram
         class TransparencyMessenger
     }
 
+    namespace agent_loop_py {
+        class AgentRefinementLoop
+    }
+
     class Song {
         +int id
         +str title
@@ -138,6 +142,7 @@ classDiagram
     class SessionLoop {
         <<module>>
         interpret_feedback(session, song, reasons, feedback) LogEntry
+        rebuild_pool(session, songs, k) tuple
     }
 
     class TransparencyMessenger {
@@ -146,7 +151,16 @@ classDiagram
         build_transparency_message(session) tuple
     }
 
+    class AgentRefinementLoop {
+        <<module>>
+        _get_agent_decision(session, topk) dict
+        apply_agent_decision(session, decision) Facet
+        run_agentic_refinement(session, catalog, k) tuple
+    }
+
     note for ScoringCore "Reason = (text: str, facet: Facet | None)<br/>score_song/recommend_songs = dict-based path<br/>Recommender = OOP path<br/>both funnel through _score()"
+
+    note for AgentRefinementLoop "Decision = facet, label, direction,<br/>magnitude (clamped 0.05-0.3), rationale<br/>-- structured Gemini output, not free text.<br/>Max 15 iterations, stops after 3 stable in a row."
 
     Recommender "1" o-- "*" Song : songs
     Recommender ..> UserProfile : scores against
@@ -167,3 +181,7 @@ classDiagram
 
     TransparencyMessenger ..> RecommendationSession : reads facet_weights.heaviest()
     TransparencyMessenger ..> LogEntry : emits OK/ERROR, no template fallback
+
+    AgentRefinementLoop ..> SessionLoop : calls rebuild_pool() each iteration
+    AgentRefinementLoop ..> RecommendationSession : mutates facet_weights per decision
+    AgentRefinementLoop ..> Facet : decision.facet drives which delta/boost moves

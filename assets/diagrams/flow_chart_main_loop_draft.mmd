@@ -1,8 +1,9 @@
 flowchart TD
     A[User query<br/>Filters + desired facets] --> B[Retrieve facets<br/>Song → artist → skip]
-    B --> C[Build & serve top-k<br/>Current round's playlist]
+    B --> R[Agentic refinement pass<br/>autonomous, up to 15 iterations,<br/>stops after 3 stable in a row]
+    R --> C[Build & serve top-k<br/>Current round's playlist]
     C --> D[Collect feedback<br/>Thumbs up / down per song]
     D --> E{Round limit reached?}
     E -- No --> F[Update weights & exclude list<br/>Show transparency message]
-    F --> C
+    F --> R
     E -- Yes --> G[Present final playlist<br/>No further replanning]
