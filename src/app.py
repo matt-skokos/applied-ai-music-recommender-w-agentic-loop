@@ -144,7 +144,7 @@ def main() -> None:
     render_profile_form(catalog)
 
     with st.expander(f"Browse the catalog ({len(catalog)} songs)"):
-        st.dataframe(catalog_dataframe(catalog), use_container_width=True)
+        st.table(catalog_dataframe(catalog))
 
     if st.button("Start over"):
         st.session_state.user_profile = None
