@@ -1,7 +1,7 @@
 flowchart TD
     A[Rebuild pool with current weights] --> B{Same top-k as<br/>previous iteration?}
     B -- Yes, 3rd time in a row --> C[Stop: stable]
-    B -- No, or fewer than 3 in a row --> D{Hit 15 iterations?}
+    B -- No, or fewer than 3 in a row --> D{Hit 5 iterations?}
     D -- Yes --> E[Stop: cap reached]
     D -- No --> F[Ask Gemini for one structured decision<br/>facet + direction + magnitude + rationale]
     F -- call failed --> C

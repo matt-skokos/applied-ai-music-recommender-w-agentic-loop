@@ -150,7 +150,7 @@ def run_agentic_refinement(
     session: RecommendationSession,
     catalog: List[Song],
     k: int = 5,
-    max_iterations: int = 15,
+    max_iterations: int = 5,
     stability_window: int = 3,
     on_step: Optional[Callable[[dict], None]] = None,
 ) -> Tuple[List[Tuple[Song, float, List[Reason]]], List[Dict]]:

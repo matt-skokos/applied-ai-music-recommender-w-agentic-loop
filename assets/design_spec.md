@@ -275,10 +275,13 @@ stabilizes or it hits a hard cap — with no human input required per step.
   afterward. The loop's exploration should feel non-deterministic because
   an LLM is making the call each time, not because of an explicit random
   number generator.
-- **Cap: 15 iterations maximum.** Stop early once **3 consecutive
-  iterations produce no change to the top-k** — chosen to give the loop
-  room to actually explore before declaring convergence, rather than
-  stopping the moment two iterations in a row happen to agree.
+- **Cap: 5 iterations maximum** (lowered from an initial 15 once real usage
+  showed it was reliably using the full budget rather than converging early
+  — 5 keeps token spend down while still giving a decent interaction).
+  Stop early once **3 consecutive iterations produce no change to the
+  top-k** — chosen to give the loop room to actually explore before
+  declaring convergence, rather than stopping the moment two iterations in
+  a row happen to agree.
 - **Runs on every generated list** — this is the new normal, not an
   optional extra. Both the initial "Generate playlist" action and every
   round after a thumbs up/down go through this refinement pass before the
@@ -328,7 +331,7 @@ structured JSON (verified working via
 flowchart TD
     A[Rebuild pool with current weights] --> B{Same top-k as<br/>previous iteration?}
     B -- Yes, 3rd time in a row --> C[Stop: stable]
-    B -- No, or fewer than 3 in a row --> D{Hit 15 iterations?}
+    B -- No, or fewer than 3 in a row --> D{Hit 5 iterations?}
     D -- Yes --> E[Stop: cap reached]
     D -- No --> F[Ask Gemini for one structured decision]
     F -- call failed --> C

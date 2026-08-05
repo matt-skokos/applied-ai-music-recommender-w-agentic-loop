@@ -160,7 +160,7 @@ classDiagram
 
     note for ScoringCore "Reason = (text: str, facet: Facet | None)<br/>score_song/recommend_songs = dict-based path<br/>Recommender = OOP path<br/>both funnel through _score()"
 
-    note for AgentRefinementLoop "Decision = facet, label, direction,<br/>magnitude (clamped 0.05-0.3), rationale<br/>-- structured Gemini output, not free text.<br/>Max 15 iterations, stops after 3 stable in a row."
+    note for AgentRefinementLoop "Decision = facet, label, direction,<br/>magnitude (clamped 0.05-0.3), rationale<br/>-- structured Gemini output, not free text.<br/>Max 5 iterations, stops after 3 stable in a row."
 
     Recommender "1" o-- "*" Song : songs
     Recommender ..> UserProfile : scores against
